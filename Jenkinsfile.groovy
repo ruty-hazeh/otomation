@@ -1,62 +1,60 @@
 pipeline {
-    agent any
+    agent {label 'verisoft-2'}
 
     parameters {
-        string(name: 'REPO_URL', defaultValue: 'https://github.com/yourusername/yourrepo.git', description: 'כתובת ה-Repository')
-        string(name: 'BRANCH_NAME', defaultValue: 'main', description: 'שם הענף (branch) להרצה')
+        string(name: 'REPO_URL', defaultValue: 'https://github.com/ruty-hazeh/otomation', description: 'Repository URL')
+        string(name: 'BRANCH_NAME', defaultValue: 'main', description: 'Branch name to build')
     }
 
     environment {
-        // מגדירים כאן משתני סביבה לפי הצורך
-        // לדוגמה: PATH או JAVA_HOME במידת הצורך
-    }
-
-    options {
-        timeout(time: 5, unit: 'MINUTES') // הגבלת זמן לכל בלוק
-    }
-
-    triggers {
-        cron('30 5 * * *')   // הרצת הפייפליין כל יום בשעה 05:30
-        cron('0 14 * * *')   // הרצת הפייפליין כל יום בשעה 14:00
+        MAIN_BRANCH = 'main'
     }
 
     stages {
-        stage('Checkout') {
+        stage('Clone code') {
             steps {
-                echo "Checking out from ${params.REPO_URL} branch ${params.BRANCH_NAME}"
-                // מורידים את הקוד מה-Repo לפי הפרמטרים שהוגדרו
-                checkout([$class: 'GitSCM',
-                          branches: [[name: params.BRANCH_NAME]],
-                          userRemoteConfigs: [[url: params.REPO_URL]]])
+                script {
+                    if (params.BRANCH_NAME == env.MAIN_BRANCH) {
+                        checkout scm
+                    } else {
+                        git branch: "${params.BRANCH_NAME}", url: "${params.REPO_URL}"
+                    }
+                }
             }
         }
 
-        stage('Compile') {
+        stage('Compilation') {
             steps {
                 echo 'Starting compilation stage'
-                sh 'mvn compile'
+                timeout(time: 5, unit: 'MINUTES') {
+                    sh returnStatus:true,script:'mvn compile'
+                }
                 echo 'Compilation stage completed successfully'
             }
         }
 
-        stage('Test') {
+        stage('Run Tests') {
             steps {
                 echo 'Starting test stage'
-                sh 'mvn test'
+                timeout(time: 5, unit: 'MINUTES') {
+                    sh returnStatus:true,script:'mvn test'
+                }
                 echo 'Test stage completed successfully'
             }
         }
     }
 
     post {
-        always {
-            echo 'This will always run, after any build status.'
-        }
         success {
-            echo 'Build succeeded!'
+            echo 'Pipeline completed successfully!'
         }
         failure {
-            echo 'Build failed!'
+            echo 'Pipeline failed.'
         }
     }
+
+    triggers {
+        cron('30 5 * * 1\n0 14 * * *')
+    }
+
 }
